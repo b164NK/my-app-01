@@ -6,22 +6,13 @@ window.onload = function(){
 	const EVENTNAME_MOVE = supportTouch? 'touchmove':'mousemove';
 	const EVENTNAME_END = supportTouch? 'touchend':'mouseup';
 
-	//var el_myCanvas = document.getElementById('myCanvas');
-	//var clientRect = el_myCanvas.getBoundingClientRect();
-
-	//↓　x,y座標の基準点を決める
-	//ページの左端から要素の左端までの距離
-	//var positionX = clientRect.left + clientRect.width/2 + window.pageXOffset ;
-	//ページの上端から要素の上端までの距離
-	//var positionY = clientRect.top + clientRect.height/2 + window.pageYOffset ;
-
   // Get a reference to the database service
   var database = firebase.database();
 
 	//Vueインスタンスが存在するかどうかを判別するフラグ
 	var first = true;
 
-	//
+	//更新内容を一時保存する変数
 	var updates = {};
 
 
@@ -102,16 +93,17 @@ window.onload = function(){
 									+Math.pow(this.intersects[0].point.y-this.cube.geometry.vertices[i].y,2)
 									+Math.pow(this.intersects[0].point.z-this.cube.geometry.vertices[i].z,2)
 								);
-								//console.log(distance);
 
 								//最寄りの頂点をドラッグ候補とする
 								if(distance < drag_vertices_dis){
 									drag_vertices_dis = distance;
 									this.drag_vertices_num = i;
+									var num = i;
 								}
 							}
 							//ドラッグ候補が見つかった時にイベントリスナー追加、マウスの移動を追う
 							if(drag_vertices_dis < 100){
+								console.log(num);
 								console.log("catch:"+this.drag_vertices_num);
 								this.canvas.addEventListener(this.eventmove,this.handleVerticesMove,{passive:false});
 								this.canvas.addEventListener(this.eventend,this.handleVerticesEnd);
@@ -121,56 +113,38 @@ window.onload = function(){
 						};
 					},
 
+
 					handleVerticesMove:function(e){
 						e.preventDefault();
 						if(this.eventmove == 'touchmove'){
 							this.handleEventmoveForTablet();
 
-							//マウスの移動距離を求める 100はバッファ
-							var mouse_moving_disX = 100*(this.mouse.x - this.mouse_positonX_holder);
-							this.mouse_positonX_holder = this.mouse.x;
-							var mouse_moving_disY = 100*(this.mouse.y - this.mouse_positonY_holder);
-							this.mouse_positonY_holder = this.mouse.y;
-
-							//頂点座標の移動距離を求めてsetする
-							this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'x',
-								this.cube.geometry.vertices[this.drag_vertices_num].x +
-								mouse_moving_disX *
-								Math.cos(this.controls.getAzimuthalAngle()));
-							this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'y',
-								this.cube.geometry.vertices[this.drag_vertices_num].y +
-								mouse_moving_disY *
-								Math.cos(Math.PI/2 - this.controls.getPolarAngle()));
-							this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'z',
-								this.cube.geometry.vertices[this.drag_vertices_num].z +
-								(-1) * (mouse_moving_disX) *
-								Math.sin(this.controls.getAzimuthalAngle()) +
-								(-1) * (mouse_moving_disY) *
-								Math.sin(Math.PI/2 - this.controls.getPolarAngle()));
-
 						}else if(this.eventmove == 'mousemove'){
-							//マウスの移動距離を求める 100はバッファ
-							var mouse_moving_disX = 100*(this.mouse.x - this.mouse_positonX_holder);
-							this.mouse_positonX_holder = this.mouse.x;
-							var mouse_moving_disY = 100*(this.mouse.y - this.mouse_positonY_holder);
-							this.mouse_positonY_holder = this.mouse.y;
 
-							//頂点座標の移動距離を求めてsetする
-							this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'x',
-								this.cube.geometry.vertices[this.drag_vertices_num].x +
-								mouse_moving_disX *
-								Math.cos(this.controls.getAzimuthalAngle()));
-							this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'y',
-								this.cube.geometry.vertices[this.drag_vertices_num].y +
-								mouse_moving_disY *
-								Math.cos(Math.PI/2 - this.controls.getPolarAngle()));
-							this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'z',
-								this.cube.geometry.vertices[this.drag_vertices_num].z +
-								(-1) * (mouse_moving_disX) *
-								Math.sin(this.controls.getAzimuthalAngle()) +
-								(-1) * (mouse_moving_disY) *
-								Math.sin(Math.PI/2 - this.controls.getPolarAngle()));
 						};
+
+						//マウスの移動距離を求める 100はバッファ
+						var mouse_moving_disX = 100*(this.mouse.x - this.mouse_positonX_holder);
+						this.mouse_positonX_holder = this.mouse.x;
+						var mouse_moving_disY = 100*(this.mouse.y - this.mouse_positonY_holder);
+						this.mouse_positonY_holder = this.mouse.y;
+
+						//頂点座標の移動距離を求めてsetする
+						this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'x',
+							this.cube.geometry.vertices[this.drag_vertices_num].x +
+							mouse_moving_disX *
+							Math.cos(this.controls.getAzimuthalAngle()));
+						this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'y',
+							this.cube.geometry.vertices[this.drag_vertices_num].y +
+							mouse_moving_disY *
+							Math.cos(Math.PI/2 - this.controls.getPolarAngle()));
+						this.$set(this.cube.geometry.vertices[this.drag_vertices_num],'z',
+							this.cube.geometry.vertices[this.drag_vertices_num].z +
+							(-1) * (mouse_moving_disX) *
+							Math.sin(this.controls.getAzimuthalAngle()) +
+							(-1) * (mouse_moving_disY) *
+							Math.sin(Math.PI/2 - this.controls.getPolarAngle()));
+
 						this.$nextTick(function(){
 							this.geometry.verticesNeedUpdate = true;
 							this.animate();
@@ -200,6 +174,7 @@ window.onload = function(){
 
 					},
 
+
 					//データベースが更新されたときにそのデータを元にシーンを変更
 					changed_DB_bySomeone:function(ss){
 						console.log("from changed_DB_bySomeone");
@@ -217,6 +192,7 @@ window.onload = function(){
 					},
 
 
+					//描画更新が必要なときに呼び出されるメソッド
 					animate:function(){
 						this.renderer.render(this.scene,this.camera);
 						console.log("render!");
@@ -252,6 +228,7 @@ window.onload = function(){
 					},
 
 
+					//Orbit操作に対して描画を更新するためのメソッド
 					OrbitStart:function(e){
 						e.preventDefault();
 						this.canvas.addEventListener(this.eventmove,this.OrbitMove);
@@ -328,10 +305,9 @@ window.onload = function(){
 				}
 		});
 	};
+	//Vueインスタンスを生成する関数　終
 
 
-
-	//コールバック関数を用いて、データベースからの読み込みを待つ
 	function waitRTDBload(){
 		database.ref('/user1').on('value',function(snapshot) {
 			//この時snapshotにデータリストが返されている
@@ -343,7 +319,6 @@ window.onload = function(){
 			}
 		});
 	};
-
 
 
 	waitRTDBload();
