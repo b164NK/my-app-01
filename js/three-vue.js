@@ -55,9 +55,9 @@ window.onload = function(){
 					//ピボット操作
 					wrap: new THREE.Group(),
 					pivot_position:{	//実際はDBから定義する
-						x:200,
-						y:100,
-						z:-200
+						x:fss.child("pivot/x").val(),
+						y:fss.child("pivot/y").val(),
+						z:fss.child("pivot/z").val()
 					},
 					Obj_Position_Holder:{ //ピボット操作の間オブジェクトの位置を保持
 						x:0,
@@ -69,11 +69,15 @@ window.onload = function(){
 																														size:30,
 																														color:0xFFFFFF,
 																													}),
-					pivot_handler: 0,							//ピボットの可視化用
+					pivot_handler: 0,			//ピボットの可視化用
+					wrap_exist: false,		//今表示されているのがcubeかwrapかを判別するためのフラグ
+					//回転操作
+					now_rote:false,
+					rote_timer:500,
 					//touch操作関連
 					pointX: 0,
 					pointY: 0,
-					myText: '画面をタッチしてください',
+					myText: '',
 					OrbitTXT:'OrbitControlをオンにする',
 					PivotTXT:'ピボット操作オン',
 					bgcolor: 'lightblue',
@@ -114,12 +118,10 @@ window.onload = function(){
 								if(distance < drag_vertices_dis){
 									drag_vertices_dis = distance;
 									this.drag_vertices_num = i;
-									var num = i;
 								}
 							}
 							//ドラッグ候補が見つかった時にイベントリスナー追加、マウスの移動を追う
 							if(drag_vertices_dis < 100){
-								console.log(num);
 								console.log("catch:"+this.drag_vertices_num);
 								this.canvas.addEventListener(this.eventmove,this.handleVerticesMove,{passive:false});
 								this.canvas.addEventListener(this.eventend,this.handleVerticesEnd);
@@ -201,8 +203,24 @@ window.onload = function(){
 							this.$set(this.cube.geometry.vertices[i],'y',ss.child("vertices/"+i+"/y").val());
 							this.$set(this.cube.geometry.vertices[i],'z',ss.child("vertices/"+i+"/z").val());
 						};
+						//ピボットの更新に対してwrap.positionを設定
+						this.$set(this.wrap.position,'x',ss.child("pivot/x").val());
+						this.$set(this.wrap.position,'y',ss.child("pivot/y").val());
+						this.$set(this.wrap.position,'z',ss.child("pivot/z").val());
+						//もしこのタイミングでwrapがsceneにあれば、cubeの位置も調整
+						if(this.wrap_exist == true){
+							this.cube.position.set(this.Obj_Position_Holder.x-this.wrap.position.x,
+																			this.Obj_Position_Holder.y-this.wrap.position.y,
+																			this.Obj_Position_Holder.z-this.wrap.position.z);
+						};
+						//pivot_handlerの位置も調整
+						this.$set(this.pivot_handler.geometry.vertices[0],'x',ss.child("pivot/x").val());
+						this.$set(this.pivot_handler.geometry.vertices[0],'y',ss.child("pivot/y").val());
+						this.$set(this.pivot_handler.geometry.vertices[0],'z',ss.child("pivot/z").val());
+
 						this.$nextTick(function(){
 							this.geometry.verticesNeedUpdate = true;
+							this.pivot_handler.geometry.verticesNeedUpdate = true;
 							this.animate();
 						});
 					},
@@ -290,6 +308,7 @@ window.onload = function(){
 																			this.Obj_Position_Holder.y,
 																			this.Obj_Position_Holder.z);
 							this.scene.add(this.cube);
+							this.wrap_exist = false;
 							this.renderer.render(this.scene, this.camera);
 
 
@@ -314,12 +333,10 @@ window.onload = function(){
 																			this.Obj_Position_Holder.y-this.wrap.position.y,
 																			this.Obj_Position_Holder.z-this.wrap.position.z);
 							this.scene.add(this.wrap);
+							this.wrap_exist = true;
 							this.renderer.render(this.scene, this.camera);
 
 							//イベントリスナー削除
-							//if(this.eventmove == 'mousemove'){
-							//	this.canvas.removeEventListener(this.eventmove,this.handleEventmove);
-							//}
 							this.canvas.removeEventListener(this.eventstart,this.handleStart);
 							this.controls.enabled = false;
 							this.canvas.removeEventListener(this.eventstart,this.OrbitStart);
@@ -331,9 +348,6 @@ window.onload = function(){
 							//イベントリスナー削除
 							this.canvas.removeEventListener(this.eventstart,this.handlePivotStart);
 							//頂点操作のイベントリスナー追加
-							//if(this.eventmove == 'mousemove'){
-							//	this.canvas.addEventListener(this.eventmove, this.handleEventmove);
-							//};
 							this.canvas.addEventListener(this.eventstart,this.handleStart,{passive:false});
 							//THREE.JSシーンからgroupを削除し、meshをaddする
 							this.scene.remove(this.wrap);
@@ -341,6 +355,7 @@ window.onload = function(){
 																			this.Obj_Position_Holder.y,
 																			this.Obj_Position_Holder.z);
 							this.scene.add(this.cube);
+							this.wrap_exist = false;
 							this.renderer.render(this.scene, this.camera);
 
 
@@ -362,7 +377,7 @@ window.onload = function(){
 						this.mouse_positonY_holder = this.mouse.y;
 
 						//クリックしたオブジェクトのピボット位置に目印となるオブジェクトを配置
-						//raycasterを用いてオブジェクトを特定(未実装)
+						//複数オブジェクトがある場合raycasterを用いてオブジェクトを特定(未実装)
 						this.scene.add(this.pivot_handler);
 
 						this.canvas.addEventListener(this.eventmove,this.handlePivotMove,{passive:false});
@@ -380,9 +395,8 @@ window.onload = function(){
 
 						};
 						//ユーザーの操作に応じて「目印」を動かす
-						//this.pivot_handler.geometry.vertices[0].x += 0.1;確認用
 
-						//マウスの移動距離を求める 100はバッファ
+						//マウスの移動距離を求める 200はバッファ
 						var mouse_moving_disX = 200*(this.mouse.x - this.mouse_positonX_holder);
 						this.mouse_positonX_holder = this.mouse.x;
 						var mouse_moving_disY = 200*(this.mouse.y - this.mouse_positonY_holder);
@@ -425,7 +439,13 @@ window.onload = function(){
 						//目印を画面から削除する
 						this.scene.remove(this.pivot_handler);
 
-						//DBのpositionデータを更新する
+						//DBのpivotデータを更新する
+						updates["pivot/x"]=this.pivot_handler.geometry.vertices[0].x;
+						updates["pivot/y"]=this.pivot_handler.geometry.vertices[0].y;
+						updates["pivot/z"]=this.pivot_handler.geometry.vertices[0].z;
+
+						//DB更新の関数を呼ぶ
+						renewDB(updates);
 
 
 						this.canvas.removeEventListener(this.eventmove,this.handlePivotMove);
@@ -435,8 +455,39 @@ window.onload = function(){
 						});
 					},
 
+					//のちに消す　確認用
 					Rotatebtn:function(){ //現在のピボットを元にy軸方向に一回転させる
+						if(this.now_rote == false && this.wrap_exist == true){
+							this.scene.add(this.pivot_handler);
+							this.now_rote = true;
+							this.rotate();
+						}
+					},
+					rotate:function(){
+						if(this.rote_timer > 0){
+							this.rote_timer -= 1;
+							this.wrap.rotation.y += 0.01;
+							this.renderer.render(this.scene,this.camera);
+							requestAnimationFrame(this.rotate);
+						}else{
+							this.rote_timer = 500;
+							this.now_rote = false;
+							this.wrap.rotation.y = 0;
+							this.scene.remove(this.pivot_handler);
+							this.animate();
 
+							this.$nextTick(function(){
+								const flag = true;
+								try {
+								    if (flag) {
+								        throw new Error('終了します');
+								    }
+								} catch (e) {
+								    console.log(e.message);
+								}
+							});
+
+						}
 					}
 
 				},
@@ -449,16 +500,15 @@ window.onload = function(){
 					this.camera.aspect = this.canvas.clientWidth / this.canvas.clientHeight;
 					this.camera.position.z = 1000;
 					this.camera.lookAt(new THREE.Vector3(0,0,0));
-					//axisHelperを表示
-					var axisHelper = new THREE.AxisHelper(1000);  // 引数は 軸のサイズ
-    			this.scene.add(axisHelper);
 
-					//イベントの設定
+
+					//イベントの設定(最初は頂点操作)
 					//raycaster用のmouse座標はスマホとPCで取得方法が違う
 					if(this.eventmove == 'mousemove'){
 						this.canvas.addEventListener(this.eventmove, this.handleEventmove);
 					}
 					this.canvas.addEventListener(this.eventstart,this.handleStart,{passive: false});
+					this.myText = '頂点操作開始';
 
 					//OrbitControlの設定(最初はオフ)
 					this.controls = new THREE.OrbitControls(this.camera);
@@ -518,8 +568,6 @@ window.onload = function(){
 		});
 	};
 
-
 	waitRTDBload();
-
 
 };
